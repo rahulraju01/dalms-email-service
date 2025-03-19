@@ -6,19 +6,24 @@ import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.thymeleaf.util.StringUtils;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.Period;
 import java.time.format.TextStyle;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 @Slf4j
@@ -33,118 +38,161 @@ public class EmailService {
     @Autowired
     private ImageLoader imageLoader;
 
+    @Autowired
+    private TaskExecutor taskExecutor;
+
+    @Value("${email-cc}")
+    private String cc;
+
     // Method to send birthday emails with background image and logo
-    public void generateBirthdayEmailContent() {
+    @Async("taskExecutor")
+    public CompletableFuture<Void> generateBirthdayEmailContent() {
         LocalDate today = LocalDate.now();
         int month = today.getMonthValue();
         int day = today.getDayOfMonth();
-        List<Object[]> result = employeeRepository.findByBirthday(month, day);
-        List<EmployeeDTO> employees = new ArrayList<>();
-        for (Object[] row : result) {
-            String employeeName = (String) row[0];
-            String email = (String) row[1];
-            LocalDate doj = ((java.sql.Date) row[2]).toLocalDate();
-            LocalDate dob = ((java.sql.Date) row[3]).toLocalDate();
-            String departmentName = (String) row[4];
-            String gender = (String) row[5];
 
-            EmployeeDTO employeeDTO = new EmployeeDTO(employeeName, email, doj, dob, departmentName, gender);
-            employees.add(employeeDTO);
-        }
+        List<EmployeeDTO> employees = getBirthdayEmployees(month, day);
 
         log.info("== Birthday Employees found with size: {}", employees.size());
 
-        for (EmployeeDTO employee : employees) {
-            try {
-                sendBirthdayEmail(employee, "Happy Birthday Wishes!", buildBirthdayMessage(employee));
-                log.info("-- Email send successfully for Employee: {}", employee.getName());
-            } catch (MessagingException | IOException e) {
-                e.printStackTrace();
-            }
-        }
+        employees.stream()
+                .filter(r -> r.getIsDeleted().toPlainString().equals("0"))
+                .map(employee -> CompletableFuture.runAsync(() -> sendBirthdayEmail(employee), taskExecutor))
+                .forEach(CompletableFuture::join);
+
+        return CompletableFuture.completedFuture(null);
     }
 
     // Method to send anniversary emails with HTML format
-    public void generateWorkAnniversaryEmailContent() {
+    @Async("taskExecutor")
+    public CompletableFuture<Void> generateWorkAnniversaryEmailContent() {
         LocalDate currentDate = LocalDate.now();
         LocalDate oneYearAgo = currentDate.minusYears(1);
         int month = currentDate.getMonthValue();
         int day = currentDate.getDayOfMonth();
-        List<Object[]> result = employeeRepository.findEmployeesWithAtLeastOneYearOfService(oneYearAgo, month, day);
-        List<EmployeeDTO> employees = new ArrayList<>();
-        for (Object[] row : result) {
-            String employeeName = Objects.nonNull(row[0]) ? (String) row[0] : null;
-            String email = (String) row[1];
-            LocalDate doj = Objects.nonNull(row[2]) ? ((java.sql.Date) row[2]).toLocalDate() : null;
-            LocalDate dob = Objects.nonNull(row[3]) ? ((java.sql.Date) row[3]).toLocalDate() : null;
-            String departmentName = Objects.nonNull(row[4]) ? (String) row[4] : null;
-            String gender = Objects.nonNull(row[5]) ? (String) row[5] : null;
 
-            EmployeeDTO employeeDTO = new EmployeeDTO(employeeName, email, doj, dob, departmentName, gender);
-            employees.add(employeeDTO);
-        }
+        List<EmployeeDTO> employees = getAnniversaryEmployees(oneYearAgo, month, day);
+
         log.info("== Anniversary Employees found with size: {}", employees.size());
 
-        for (EmployeeDTO employee : employees) {
-            try {
-                sendWorkAnniversaryEmail(employee, "Happy Work Anniversary!", buildAnniversaryMessage(employee));
-            } catch (MessagingException | IOException e) {
-                e.printStackTrace();
-            }
-        }
+        employees.stream()
+                .filter(r -> r.getIsDeleted().toPlainString().equals("0"))
+                .map(employee -> CompletableFuture.runAsync(() -> sendWorkAnniversaryEmail(employee), taskExecutor))
+                .forEach(CompletableFuture::join);
+
+        return CompletableFuture.completedFuture(null);
     }
 
+    // Helper method to get the list of birthday employees
+    private List<EmployeeDTO> getBirthdayEmployees(int month, int day) {
+        return employeeRepository.findByBirthday(month, day).stream()
+                .map(row -> mapToEmployeeDTO(row))
+                .toList();
+    }
+
+    // Helper method to get the list of work anniversary employees
+    private List<EmployeeDTO> getAnniversaryEmployees(LocalDate oneYearAgo, int month, int day) {
+        return employeeRepository.findEmployeesWithAtLeastOneYearOfService(oneYearAgo, month, day).stream()
+                .map(row -> mapToEmployeeDTO(row))
+                .toList();
+    }
+
+    // Helper method to map raw data to EmployeeDTO
+    private EmployeeDTO mapToEmployeeDTO(Object[] row) {
+        String employeeName = Optional.ofNullable(row[0]).map(String.class::cast).orElse("");
+        String email = Optional.ofNullable(row[1]).map(String.class::cast).orElse("");
+        LocalDate dateOfJoining = Optional.ofNullable(row[2]).map(value -> ((java.sql.Date) value).toLocalDate()).orElse(null);
+        LocalDate dateOfBirth = Optional.ofNullable(row[3]).map(value -> ((java.sql.Date) value).toLocalDate()).orElse(null);
+        String departmentName = Optional.ofNullable(row[4]).map(String.class::cast).orElse("");
+        String gender = Optional.ofNullable(row[5]).map(String.class::cast).orElse("");
+        BigDecimal isDeleted = Optional.ofNullable(row[6]).map(BigDecimal.class::cast).orElse(null);
+        return new EmployeeDTO(employeeName, email, dateOfJoining, dateOfBirth, departmentName, gender, isDeleted);
+    }
+
+    // Method to build the birthday message HTML
     private String buildBirthdayMessage(EmployeeDTO employee) {
         String genderPronoun = StringUtils.equalsIgnoreCase(employee.getGender(), "M") ? "he" : "she";
         String genderTeam = StringUtils.equalsIgnoreCase(employee.getGender(), "M") ? "his" : "her";
-        return "<html>" +
+
+        return "<html xmlns:v='urn:schemas-microsoft-com:vml' xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns:m='http://schemas.microsoft.com/office/2004/12/omml' xmlns='http://www.w3.org/TR/REC-html40'>" +
                 "<head>" +
+                "<meta http-equiv='Content-Type' content='text/html; charset=us-ascii'>" +
+                "<meta name='Generator' content='Microsoft Word 15 (filtered medium)'>" +
                 "<style>" +
                 "body {" +
+                "   background-color: #FBE4D5;" +
+                "   font-family: 'Monotype Corsiva', sans-serif;" +
+                "   font-size: 22pt;" +
+                "   text-align: center;" +
                 "   margin: 0;" +
                 "   padding: 0;" +
-                "   width: 100%;" +
-                "   height: 100%;" +
-                "   font-family: Arial, sans-serif;" +
-                "   color: black;" +
-                "   text-align: center;" +
-                "   background-color: #f0f0f0;" +
                 "}" +
-                " .content {" +
-                "   padding: 30px;" +
-                "   background: rgba(255, 255, 255, 0.9);" +
+                ".content {" +
+                "   padding: 5px;" +
                 "   border-radius: 10px;" +
-                "   font-size: 20px;" +
-                "   font-weight: normal;" +
-                "   line-height: 1.5;" +
+                "   display: inline-block;" +
+                "   width: 95%;" +
                 "}" +
-                " .image {" +
+                ".image {" +
                 "   max-width: 100%;" +
                 "   height: auto;" +
                 "   margin-top: 30px;" +
                 "}" +
-                " .logo {" +
+                "h2, p {" +
+                "   margin: 10px 0;" +
+                "   font-size: 22pt;" +
+                "   font-family: 'Monotype Corsiva', serif;" +
+                "}" +
+                ".logo {" +
                 "   position: absolute;" +
                 "   bottom: 20px;" +
                 "   right: 20px;" +
                 "   width: 120px;" +
                 "   height: auto;" +
                 "}" +
+                "#footer {" +
+                "   display: flex;" +
+                "   flex-direction: column;" +
+                "   align-items: flex-start;" +
+                "}" +
                 "</style>" +
                 "</head>" +
                 "<body>" +
                 "<div class='content'>" +
-                "<h2>Please join me in wishing <strong>" + employee.getName() + "</strong> from <strong>" + employee.getDepartmentName() + "</strong> Team as " + genderPronoun + " celebrates " + genderTeam + " Birthday today on " +
-                employee.getDateOfBirth().getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH) + " " + employee.getDateOfBirth().getDayOfMonth() + "th.</h2>" +
-                "<p>Wishing you <strong>" + employee.getName() + "</strong>,<br/>" +
-                "Many Many Happy Returns of the Day!!!</p>" +
+                "<p style='color: #002060; display: flex;'><strong>Dear All,</strong></p>" +
+                "<p style='color: #993300; margin-right: 100px;'><strong>Please join me in wishing <span style='color: #002060;'>" + employee.getName() + "</span> from <span style='color: #002060;'>" + employee.getDepartmentName() + "</span> Team as " + genderPronoun + " celebrates " + genderTeam + " Birthday today on " +
+                "<span style='color: #002060;'>" + employee.getDateOfBirth().getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH) + " " + employee.getDateOfBirth().getDayOfMonth() + "th</span>.</strong></p>" +
+                "<p style='color: #993300;display: flex; align-items: flex-start;' class='greeting'><strong>Wishing you </strong><span style='color: #002060;'><strong>" + employee.getName() + ",</strong></span></p>" +
+                "<p style='color: #002060;' class='greeting' style='font-size: 26pt;'><strong><u>Happy Birthday!!</u></strong></p>" +
                 "<img src='cid:birthdayImage' class='image' alt='Birthday Image'/>" +
-                "<p>Regards,<br>HRD</p>" +
+                "<p id='footer' style='color: #993300;' class='greeting'><strong>Regards</strong>,<br><span style='color: #002060;'><strong>HRD</strong></span></p>" +
                 "</div>" +
                 "</body>" +
                 "</html>";
     }
 
+
+    // Method to send the birthday email asynchronously
+    private void sendBirthdayEmail(EmployeeDTO employee) {
+        try {
+            String message = buildBirthdayMessage(employee);
+            sendEmail(employee.getEmail(), "Happy Birthday Wishes!", message, "birthdayImage", imageLoader.getRandomBirthdayTemplate());
+            log.info("-- Email sent successfully for Employee: {}", employee.getName());
+        } catch (MessagingException | IOException e) {
+            log.error("Error sending birthday email: {} for Employee: {}", employee.getEmail(), employee.getName(), e);
+        }
+    }
+
+    // Method to send work anniversary email asynchronously
+    private void sendWorkAnniversaryEmail(EmployeeDTO employee) {
+        try {
+            String message = buildAnniversaryMessage(employee);
+            sendEmail(employee.getEmail(), "Happy Work Anniversary!", message, "anniversaryImage", imageLoader.getRandomWorkAnniversaryTemplate());
+            log.info("-- Email sent successfully for Employee: {}", employee.getName());
+        } catch (MessagingException | IOException e) {
+            log.error("Error sending work anniversary email {} for Employee: {}", employee.getEmail(),employee.getName(), e);
+        }
+    }
 
     private String buildAnniversaryMessage(EmployeeDTO employee) {
         // Get the total years the employee has worked
@@ -231,38 +279,16 @@ public class EmailService {
         }
     }
 
-
-    // Send the email with HTML content, background image and logo
-    private void sendBirthdayEmail(EmployeeDTO employee, String subject, String message) throws MessagingException, IOException {
+    // Common method to send email with inline image
+    private void sendEmail(String to, String subject, String message, String imageCid, Resource imageContent) throws MessagingException, IOException {
         MimeMessage mimeMessage = mailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true);
-
-        String[] recipients = {employee.getEmail()};
-        helper.setTo(recipients);
+        helper.setTo(to);
+        helper.setCc(cc);
         helper.setSubject(subject);
         helper.setText(message, true); // true to send HTML email
-
-        // Attach the birthday image as the background
-//        ClassPathResource birthdayImage = new ClassPathResource("static/birthday_image.jpg"); // Put image in src/main/resources/static
-        helper.addInline("birthdayImage", imageLoader.getRandomBirthdayTemplate());
-
+        helper.addInline(imageCid, imageContent);
         mailSender.send(mimeMessage);
-        log.info("Birthday email sent to {}", employee.getEmail());
-    }
-
-    private void sendWorkAnniversaryEmail(EmployeeDTO employee, String subject, String message) throws MessagingException, IOException {
-        MimeMessage mimeMessage = mailSender.createMimeMessage();
-        MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true);
-
-        helper.setTo(employee.getEmail());
-        helper.setSubject(subject);
-        helper.setText(message, true); // true to send HTML email
-
-        // Attach the birthday image as the background
-//        ClassPathResource birthdayImage = new ClassPathResource("static/birthday_image.jpg"); // Put image in src/main/resources/static
-        helper.addInline("anniversaryImage", imageLoader.getRandomWorkAnniversaryTemplate());
-
-        mailSender.send(mimeMessage);
-        log.info("Work Anniversary email sent to {}", employee.getEmail());
+        log.info("Email sent to {}", to);
     }
 }

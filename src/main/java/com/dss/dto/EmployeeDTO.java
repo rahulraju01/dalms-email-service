@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Getter @Setter
@@ -17,4 +18,5 @@ public class EmployeeDTO {
     private LocalDate dateOfBirth;
     private String departmentName;
     private String gender;
+    private BigDecimal isDeleted;
 }
