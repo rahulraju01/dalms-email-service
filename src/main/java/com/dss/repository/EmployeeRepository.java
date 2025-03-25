@@ -17,15 +17,15 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     //    @Query("SELECT e FROM Employee e WHERE EXTRACT(YEAR FROM CURRENT_DATE) - EXTRACT(YEAR FROM e.startDate) >= 1")
 //    List<Employee> findEmployeesWithAnniversary();
 
-    @Query(value = "SELECT e.name, e.email_id, e.doj, e.dob, d.deptname, e.gender, e.isdeleted " +
+    @Query(value = "SELECT e.name, e.email_id, e.doj, e.dob, d.deptname, e.gender " +
             "FROM employee e JOIN department d ON e.deptcode = d.deptcode " +
             "WHERE EXTRACT(MONTH FROM e.dob) = :month " +
-            "AND EXTRACT(DAY FROM e.dob) = :day", nativeQuery = true)
+            "AND EXTRACT(DAY FROM e.dob) = :day and dol is null", nativeQuery = true)
     List<Object[]> findByBirthday(@Param("month") int month, @Param("day") int day);
 
-    @Query(value = "SELECT e.name, e.email_id, e.doj, e.dob, d.deptname, e.gender, e.isdeleted " +
+    @Query(value = "SELECT e.name, e.email_id, e.doj, e.dob, d.deptname, e.gender " +
             "FROM employee e JOIN department d ON e.deptcode = d.deptcode " +
-            "WHERE e.doj <= :oneYearAgo and EXTRACT(MONTH FROM e.doj) = :month and EXTRACT(DAY FROM e.doj) = :day", nativeQuery = true)
+            "WHERE e.doj <= :oneYearAgo and EXTRACT(MONTH FROM e.doj) = :month and EXTRACT(DAY FROM e.doj) = :day and dol is null", nativeQuery = true)
     List<Object[]> findEmployeesWithAtLeastOneYearOfService(@Param("oneYearAgo") LocalDate oneYearAgo, @Param("month") int month, @Param("day") int day);
 
 }

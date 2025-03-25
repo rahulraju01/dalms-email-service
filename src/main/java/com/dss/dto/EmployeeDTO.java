@@ -18,5 +18,4 @@ public class EmployeeDTO {
     private LocalDate dateOfBirth;
     private String departmentName;
     private String gender;
-    private BigDecimal isDeleted;
 }
