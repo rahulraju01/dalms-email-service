@@ -48,7 +48,7 @@ color: #993300;
 		<span>
 			<strong>
 			<span>Regards,</span><br>
-			<span style="color: #002060">HRD</span>
+			<span style="color: #002060">Direction Software LLP</span>
 			</strong>
 		</span>
 		</div>

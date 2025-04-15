@@ -18,4 +18,5 @@ public class EmployeeDTO {
     private LocalDate dateOfBirth;
     private String departmentName;
     private String gender;
+    private String designation;
 }

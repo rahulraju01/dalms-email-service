@@ -6,12 +6,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 @Component
 public class ImageLoader {
@@ -21,21 +21,22 @@ public class ImageLoader {
 
     private List<Resource> birthdayImageResources = new ArrayList<>();
     private List<Resource> workAnniversaryImageResources = new ArrayList<>();
+    private Map<String, Resource> iconResourceMap = new HashMap<>();
 
     // This method loads images from the static folder at application startup
     @PostConstruct
     public void loadResources() {
-        loadResourcesForType("birthday_collections", birthdayImageResources);
-        loadResourcesForType("work_anniversary_collections", workAnniversaryImageResources);
+        loadResourcesForType("birthday_collections", getBirthdayOrAnniversaryFunction(birthdayImageResources));
+        loadResourcesForType("work_anniversary_collections", getBirthdayOrAnniversaryFunction(workAnniversaryImageResources));
+        loadResourcesForType("logo", getIconLoaderFunction(iconResourceMap));
     }
 
-    // Generic method to load resources into a list based on folder type
-    private void loadResourcesForType(String folderName, List<Resource> resourceList) {
+    private void loadResourcesForType(String folderName, Consumer<Resource[]> resourceConsumer) {
         String folderPath = "classpath*:/static/" + folderName;
         Resource[] resources = loadResourcesList(folderPath);
 
         if (resources != null) {
-            Collections.addAll(resourceList, resources);
+            resourceConsumer.accept(resources);
         } else {
             logger.error("No resources found for folder: {}", folderName);
         }
@@ -72,5 +73,28 @@ public class ImageLoader {
         }
         int randomIndex = new Random().nextInt(resources.size());
         return resources.get(randomIndex);
+    }
+
+    public Resource getIconResourceByName(String iconName) {
+        return Optional.ofNullable(iconName)
+                .map(icon -> iconResourceMap.getOrDefault(icon, null))
+                .orElseThrow(() -> {
+                    throw new NoSuchElementException(String.format("Unable to fetch resource for icon: %s", iconName));
+                });
+    }
+
+    private Consumer<Resource[]> getBirthdayOrAnniversaryFunction(List<Resource> resourceList) {
+        return (resources) -> Collections.addAll(resourceList, resources);
+    }
+
+    private Consumer<Resource[]> getIconLoaderFunction(Map<String, Resource> resourceMap) {
+        return (resources) -> Stream.of(resources)
+                .filter(Resource::isReadable)
+                .filter(r -> StringUtils.hasText(r.getFilename()))
+                .forEach(res -> {
+                    String filename = res.getFilename();
+                    String key = filename.replaceFirst("[.][^.]+$", ""); // remove extension
+                    resourceMap.putIfAbsent(key, res); // only add if key is not already present
+                });
     }
 }

@@ -5,6 +5,7 @@ import com.dss.repository.EmployeeRepository;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
 import freemarker.template.TemplateException;
+import jakarta.annotation.PostConstruct;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.extern.slf4j.Slf4j;
@@ -20,17 +21,17 @@ import org.thymeleaf.util.StringUtils;
 
 import java.io.IOException;
 import java.io.StringWriter;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.Period;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
 @Service
 @Slf4j
 public class EmailService {
+
+    private Set<String> designationList = new HashSet<>();
 
     @Autowired
     private JavaMailSender mailSender;
@@ -53,6 +54,18 @@ public class EmailService {
     @Value("${spring.mail.username}")
     private String from;
 
+    @PostConstruct
+    public void init(){
+        designationList = employeeRepository.fetchDesignationList();
+    }
+
+    private Set<String> getDesignationList(){
+        if(designationList.isEmpty()){
+            throw new IllegalStateException("Designation list found empty");
+        }
+        return designationList;
+    }
+
     @Async("taskExecutor")
     public CompletableFuture<Void> generateBirthdayEmailContent() {
         LocalDate today = LocalDate.now();
@@ -64,48 +77,20 @@ public class EmailService {
         log.info("== Birthday Employees found with size: {}", employees.size());
 
         employees.stream()
-                .map(employee -> CompletableFuture.runAsync(() -> sendBirthdayEmail(employee), taskExecutor))
+                .map(employee -> CompletableFuture.runAsync(() ->
+                        sendBirthdayEmail(employee, getDesignationList().contains(employee.getDesignation())), taskExecutor))
                 .forEach(CompletableFuture::join);
 
         return CompletableFuture.completedFuture(null);
     }
 
-    // Helper method to get the list of birthday employees
-    private List<EmployeeDTO> getBirthdayEmployees(int month, int day) {
-        return employeeRepository.findByBirthday(month, day).stream()
-                .map(row -> mapToEmployeeDTO(row))
-                .toList();
-    }
-
-    // Helper method to send birthday email asynchronously
-    private void sendBirthdayEmail(EmployeeDTO employee) {
-        try {
-            String message = generateFreemarkerBirthdayTemplate(employee);
-            sendEmail(employee.getEmail(), "Happy Birthday Wishes!", message, "birthdayImage", imageLoader.getRandomBirthdayTemplate());
-            log.info("-- Email sent successfully for Employee: {}", employee.getName());
-        } catch (MessagingException | IOException | TemplateException e) {
-            log.error("Error sending birthday email: {} for Employee: {}", employee.getEmail(), employee.getName(), e);
+    @Async("taskExecutor")
+    public CompletableFuture<Void> generateWhizzibleContent() {
+        DayOfWeek today = LocalDate.now().getDayOfWeek();
+        if (today == DayOfWeek.FRIDAY) {
+            sendWhizzibleEmail();
         }
-    }
-
-    // Method to generate email content using Freemarker template
-    private String generateFreemarkerBirthdayTemplate(EmployeeDTO employee) throws IOException, TemplateException {
-        Template template = freemarkerConfig.getTemplate("birthday-email.ftl"); // Load the template file
-
-        // Prepare data for the template
-        Map<String, Object> templateData = new HashMap<>();
-        templateData.put("employeeName", employee.getName());
-        templateData.put("departmentName", employee.getDepartmentName());
-        templateData.put("genderPronoun", employee.getGender().equals("M") ? "he" : "she");
-        templateData.put("genderTeam", employee.getGender().equals("M") ? "his" : "her");
-        templateData.put("dobMonth", employee.getDateOfBirth().getMonth().name());
-        templateData.put("dobDay", employee.getDateOfBirth().getDayOfMonth());
-
-        // Process the template and generate the HTML content
-        StringWriter stringWriter = new StringWriter();
-        template.process(templateData, stringWriter);
-
-        return stringWriter.toString();
+        return CompletableFuture.completedFuture(null);
     }
 
     // Method to send work anniversary emails with Freemarker template
@@ -127,6 +112,87 @@ public class EmailService {
         return CompletableFuture.completedFuture(null);
     }
 
+    // Helper method to get the list of birthday employees
+    private List<EmployeeDTO> getBirthdayEmployees(int month, int day) {
+        return employeeRepository.findByBirthday(month, day).stream()
+                .map(row -> mapToEmployeeDTO(row))
+                .toList();
+    }
+
+    // Helper method to send birthday email asynchronously
+    private void sendBirthdayEmail(EmployeeDTO employee, boolean isManager) {
+        try {
+            String message = isManager ? generateFreemarkerManagerBirthdayTemplate(employee) : generateFreemarkerBirthdayTemplate(employee);
+            String subject = isManager ? "Happy Birthday Manager!" : "Happy Birthday Wishes!";
+            sendEmail(employee.getEmail(), subject, message, "birthdayImage", imageLoader.getRandomBirthdayTemplate());
+
+            log.info("-- Email sent successfully for {}: {}", isManager ? "Manager" : "Employee", employee.getName());
+        } catch (MessagingException | IOException | TemplateException e) {
+            log.error("Error sending birthday email: {} for {}: {}", employee.getEmail(),isManager ? "manager": "employee", employee.getName(), e);
+        }
+    }
+
+    // Helper method to send birthday email asynchronously
+    private void sendWhizzibleEmail() {
+        String employeeName = "r.raju@direction.biz";
+        try {
+            String message = generateFreemarkerWhizzibleTemplate();
+            sendEmail(employeeName, "Whizible Entries for the week", message, "whizzibleLogo", imageLoader.getIconResourceByName("whizzible-logo"));
+            log.info("-- Whizzible Reminder email sent to employee: {}", employeeName);
+        } catch (MessagingException | IOException | TemplateException e) {
+            log.error("Error sending birthday email: {} for Employee: {}", employeeName, employeeName, e);
+        }
+    }
+
+    // Method to generate email content using Freemarker template
+    private String generateFreemarkerWhizzibleTemplate() throws IOException, TemplateException {
+        Template template = freemarkerConfig.getTemplate("whizzible-template.ftl"); // Load the template file
+        Map<String, Object> model = new HashMap<>();
+        StringWriter stringWriter = new StringWriter();
+        template.process(model, stringWriter);
+        return stringWriter.toString();
+    }
+
+    // Method to generate email content using Freemarker template
+    private String generateFreemarkerBirthdayTemplate(EmployeeDTO employee) throws IOException, TemplateException {
+        Template template = freemarkerConfig.getTemplate("birthday-employee.ftl"); // Load the template file
+
+        // Prepare data for the template
+        Map<String, Object> templateData = new HashMap<>();
+        templateData.put("employeeName", employee.getName());
+        templateData.put("departmentName", employee.getDepartmentName());
+        templateData.put("genderPronoun", employee.getGender().equals("M") ? "he" : "she");
+        templateData.put("genderTeam", employee.getGender().equals("M") ? "his" : "her");
+        templateData.put("dobMonth", employee.getDateOfBirth().getMonth().name());
+        templateData.put("dobDay", employee.getDateOfBirth().getDayOfMonth());
+
+        // Process the template and generate the HTML content
+        StringWriter stringWriter = new StringWriter();
+        template.process(templateData, stringWriter);
+
+        return stringWriter.toString();
+    }
+
+    // Method to generate email content using Freemarker template
+    private String generateFreemarkerManagerBirthdayTemplate(EmployeeDTO employee) throws IOException, TemplateException {
+        Template template = freemarkerConfig.getTemplate("birthday-manager.ftl"); // Load the template file
+
+        // Prepare data for the template
+        Map<String, Object> templateData = new HashMap<>();
+        templateData.put("employeeName", employee.getName());
+        templateData.put("departmentName", employee.getDepartmentName());
+        templateData.put("genderPronoun", employee.getGender().equals("M") ? "he" : "she");
+        templateData.put("genderTeam", employee.getGender().equals("M") ? "his" : "her");
+        templateData.put("dobMonth", employee.getDateOfBirth().getMonth().name());
+        templateData.put("dobDay", employee.getDateOfBirth().getDayOfMonth());
+
+        // Process the template and generate the HTML content
+        StringWriter stringWriter = new StringWriter();
+        template.process(templateData, stringWriter);
+
+        return stringWriter.toString();
+    }
+
     // Helper method to get the list of work anniversary employees
     private List<EmployeeDTO> getAnniversaryEmployees(LocalDate oneYearAgo, int month, int day) {
         return employeeRepository.findEmployeesWithAtLeastOneYearOfService(oneYearAgo, month, day).stream()
@@ -143,9 +209,10 @@ public class EmailService {
         LocalDate dateOfBirth = Optional.ofNullable(row[3]).map(value -> ((java.sql.Date) value).toLocalDate()).orElse(null);
         String departmentName = Optional.ofNullable(row[4]).map(String.class::cast).orElse("");
         String gender = Optional.ofNullable(row[5]).map(String.class::cast).orElse("");
+        String designation = Optional.ofNullable(row[6]).map(String.class::cast).orElse("");
 
         // Return a new EmployeeDTO with the mapped data
-        return new EmployeeDTO(employeeName, email, dateOfJoining, dateOfBirth, departmentName, gender);
+        return new EmployeeDTO(employeeName, email, dateOfJoining, dateOfBirth, departmentName, gender, designation);
     }
 
     // Helper method to send work anniversary email asynchronously
