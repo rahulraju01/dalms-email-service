@@ -1,7 +1,6 @@
 package com.dss.config;
 
 import com.dss.emailservice.EmailService;
-import com.dss.repository.EmployeeRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
@@ -12,11 +11,9 @@ import java.util.concurrent.CompletableFuture;
 @Slf4j
 public class StartupRunner implements CommandLineRunner {
     private final EmailService emailService;
-    private final EmployeeRepository employeeRepository;
 
-    public StartupRunner(EmailService emailService, EmployeeRepository employeeRepository) {
+    public StartupRunner(EmailService emailService) {
         this.emailService = emailService;
-        this.employeeRepository = employeeRepository;
     }
 
     @Override
