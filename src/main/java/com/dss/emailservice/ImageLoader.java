@@ -19,14 +19,16 @@ public class ImageLoader {
     private static final String IMAGE_EXTENSION = "/*.{jpg,png,jpeg}";
     private static final Logger logger = LoggerFactory.getLogger(ImageLoader.class);
 
-    private List<Resource> birthdayImageResources = new ArrayList<>();
+    private List<Resource> employeeBirthdayImageResources = new ArrayList<>();
+    private List<Resource> managerBirthdayImageResources = new ArrayList<>();
     private List<Resource> workAnniversaryImageResources = new ArrayList<>();
     private Map<String, Resource> iconResourceMap = new HashMap<>();
 
     // This method loads images from the static folder at application startup
     @PostConstruct
     public void loadResources() {
-        loadResourcesForType("birthday_collections", getBirthdayOrAnniversaryFunction(birthdayImageResources));
+        loadResourcesForType("employee_birthday_collections", getBirthdayOrAnniversaryFunction(employeeBirthdayImageResources));
+        loadResourcesForType("manager_birthday_collections", getBirthdayOrAnniversaryFunction(managerBirthdayImageResources));
         loadResourcesForType("work_anniversary_collections", getBirthdayOrAnniversaryFunction(workAnniversaryImageResources));
         loadResourcesForType("logo", getIconLoaderFunction(iconResourceMap));
     }
@@ -55,9 +57,14 @@ public class ImageLoader {
         }
     }
 
-    // Method to get a random birthday template
-    public Resource getRandomBirthdayTemplate() {
-        return getRandomTemplate(birthdayImageResources);
+    // Method to get a random birthday template for employees
+    public Resource getRandomEmployeeBirthdayTemplate() {
+        return getRandomTemplate(employeeBirthdayImageResources);
+    }
+
+    // Method to get a random birthday template for managers
+    public Resource getRandomManagerBirthdayTemplate() {
+        return getRandomTemplate(managerBirthdayImageResources);
     }
 
     // Method to get a random work anniversary template

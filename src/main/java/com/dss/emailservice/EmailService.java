@@ -123,8 +123,9 @@ public class EmailService {
     private void sendBirthdayEmail(EmployeeDTO employee, boolean isManager) {
         try {
             String message = isManager ? generateFreemarkerManagerBirthdayTemplate(employee) : generateFreemarkerBirthdayTemplate(employee);
-            String subject = isManager ? "Happy Birthday Manager!" : "Happy Birthday Wishes!";
-            sendEmail(employee.getEmail(), subject, message, "birthdayImage", imageLoader.getRandomBirthdayTemplate());
+            String subject = String.format("Heartiest Birthday Wishes................%s!", employee.getName());
+            Resource resource = isManager ? imageLoader.getRandomManagerBirthdayTemplate() : imageLoader.getRandomEmployeeBirthdayTemplate();
+            sendEmail(employee.getEmail(), subject, message, "birthdayImage", resource);
 
             log.info("-- Email sent successfully for {}: {}", isManager ? "Manager" : "Employee", employee.getName());
         } catch (MessagingException | IOException | TemplateException e) {

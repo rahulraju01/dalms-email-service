@@ -23,7 +23,9 @@ public class StartupRunner implements CommandLineRunner {
         CompletableFuture<Void> workAnniversaryEmails = emailService.generateWorkAnniversaryEmailContent();
         CompletableFuture<Void> whizzibleEmails = emailService.generateWhizzibleContent();
 
-        CompletableFuture.allOf(birthdayEmails, workAnniversaryEmails, whizzibleEmails).join();
+        CompletableFuture.allOf(birthdayEmails, workAnniversaryEmails, whizzibleEmails)
+                .join();
+
         log.info("-- All Emails Sent --");
         log.info("-- Shutting Down Application --");
         System.exit(0);
