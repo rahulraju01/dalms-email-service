@@ -48,7 +48,7 @@ public class EmailService {
     @Autowired
     private Configuration freemarkerConfig; // Freemarker configuration
 
-    @Value("${email-cc}")
+    @Value("${EMAIL_CC}")
     private String cc;
 
     @Value("${spring.mail.username}")
