@@ -78,7 +78,14 @@ public class EmailService {
 
         employees.stream()
                 .map(employee -> CompletableFuture.runAsync(() ->
-                        sendBirthdayEmail(employee, getDesignationList().contains(employee.getDesignation())), taskExecutor))
+                        {
+                            try {
+                                sendBirthdayEmail(employee, getDesignationList().contains(employee.getDesignation()));
+                            } catch (Exception ex) {
+                                log.error("Unexpected error during async email sending", ex);
+                            }
+                        }
+                        , taskExecutor))
                 .forEach(CompletableFuture::join);
 
         return CompletableFuture.completedFuture(null);
@@ -140,7 +147,7 @@ public class EmailService {
             String message = generateFreemarkerWhizzibleTemplate();
             sendEmail(employeeName, "Whizible Entries for the week", message, "whizzibleLogo", imageLoader.getIconResourceByName("whizzible-logo"));
             log.info("-- Whizzible Reminder email sent to employee: {}", employeeName);
-        } catch (MessagingException | IOException | TemplateException e) {
+        } catch (Exception e) {
             log.error("Error sending birthday email: {} for Employee: {}", employeeName, employeeName, e);
         }
     }
@@ -231,7 +238,7 @@ public class EmailService {
             String message = generateAnniversaryFreemarkerTemplate(employee);
             sendEmail(employee.getEmail(), "Happy Work Anniversary!", message, "anniversaryImage", imageLoader.getRandomWorkAnniversaryTemplate());
             log.info("-- Email sent successfully for Employee: {}", employee.getName());
-        } catch (MessagingException | IOException | TemplateException e) {
+        } catch (Exception e) {
             log.error("Error sending work anniversary email {} for Employee: {}", employee.getEmail(), employee.getName(), e);
         }
     }

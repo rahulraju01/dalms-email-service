@@ -85,9 +85,7 @@ public class ImageLoader {
     public Resource getIconResourceByName(String iconName) {
         return Optional.ofNullable(iconName)
                 .map(icon -> iconResourceMap.getOrDefault(icon, null))
-                .orElseThrow(() -> {
-                    throw new NoSuchElementException(String.format("Unable to fetch resource for icon: %s", iconName));
-                });
+                .orElseThrow(() -> new NoSuchElementException(String.format("Unable to fetch resource for icon: %s", iconName)));
     }
 
     private Consumer<Resource[]> getBirthdayOrAnniversaryFunction(List<Resource> resourceList) {
