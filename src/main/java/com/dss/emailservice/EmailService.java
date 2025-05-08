@@ -305,7 +305,7 @@ public class EmailService {
         helper.setTo(to);
 
         if(! StringUtils.isEmpty(cc)) {
-            if(StringUtils.equalsIgnoreCase(subject, "Happy Work Anniversary!")) {
+            if(StringUtils.equalsIgnoreCase(subject, "Happy Work Anniversary!") && ! StringUtils.isEmpty(reportingManager)) {
                 helper.setCc(reportingManager);
             } else {
                 helper.setCc(cc);
