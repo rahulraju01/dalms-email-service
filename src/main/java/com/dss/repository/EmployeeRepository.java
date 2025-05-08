@@ -16,9 +16,12 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
             "AND EXTRACT(DAY FROM e.dob) = :day and dol is null", nativeQuery = true)
     List<Object[]> findByBirthday(@Param("month") int month, @Param("day") int day);
 
-    @Query(value = "SELECT e.name, e.email_id, e.doj, e.dob, d.deptname, e.gender, e.designation " +
-            "FROM employee e JOIN department d ON e.deptcode = d.deptcode " +
-            "WHERE e.doj <= :oneYearAgo and EXTRACT(MONTH FROM e.doj) = :month and EXTRACT(DAY FROM e.doj) = :day and dol is null", nativeQuery = true)
+    @Query(value = "SELECT e.name, e.email_id, e.doj, e.dob, d.deptname, e.gender, e.designation, " +
+            "mgr.email_id AS reporting_manager FROM employee e " +
+            "JOIN department d ON e.deptcode = d.deptcode " +
+            "LEFT JOIN employee mgr ON mgr.empcode = e.reportingto " +
+            "WHERE e.doj <= :oneYearAgo AND EXTRACT(MONTH FROM e.doj) = :month " +
+            "AND EXTRACT(DAY FROM e.doj) = :day AND e.dol IS NULL", nativeQuery = true)
     List<Object[]> findEmployeesWithAtLeastOneYearOfService(@Param("oneYearAgo") LocalDate oneYearAgo, @Param("month") int month, @Param("day") int day);
 
     @Query(value = "select distinct emp.designation from employee emp where lower(emp.designation) like '%manager%';",

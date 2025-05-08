@@ -132,7 +132,7 @@ public class EmailService {
             String message = isManager ? generateFreemarkerManagerBirthdayTemplate(employee) : generateFreemarkerBirthdayTemplate(employee);
             String subject = String.format("Heartiest Birthday Wishes................%s!", employee.getName());
             Resource resource = isManager ? imageLoader.getRandomManagerBirthdayTemplate() : imageLoader.getRandomEmployeeBirthdayTemplate();
-            sendEmail(employee.getEmail(), subject, message, "birthdayImage", resource);
+            sendEmail(employee.getEmail(), null, subject, message, "birthdayImage", resource);
 
             log.info("-- Email sent successfully for {}: {}", isManager ? "Manager" : "Employee", employee.getName());
         } catch (MessagingException | IOException | TemplateException e) {
@@ -145,7 +145,7 @@ public class EmailService {
         String employeeName = "r.raju@direction.biz";
         try {
             String message = generateFreemarkerWhizzibleTemplate();
-            sendEmail(employeeName, "Whizible Entries for the week", message, "whizzibleLogo", imageLoader.getIconResourceByName("whizzible-logo"));
+            sendEmail(employeeName, null, "Whizible Entries for the week", message, "whizzibleLogo", imageLoader.getIconResourceByName("whizzible-logo"));
             log.info("-- Whizzible Reminder email sent to employee: {}", employeeName);
         } catch (Exception e) {
             log.error("Error sending birthday email: {} for Employee: {}", employeeName, employeeName, e);
@@ -218,9 +218,10 @@ public class EmailService {
         String departmentName = Optional.ofNullable(row[4]).map(String.class::cast).orElse("");
         String gender = Optional.ofNullable(row[5]).map(this::safeToString).orElse("");
         String designation = Optional.ofNullable(row[6]).map(String.class::cast).orElse("");
+        String reportingManagerEmail = Optional.ofNullable(row.length > 7 ? row[7] : null).map(String.class::cast).orElse("");
 
         // Return a new EmployeeDTO with the mapped data
-        return new EmployeeDTO(employeeName, email, dateOfJoining, dateOfBirth, departmentName, gender, designation);
+        return new EmployeeDTO(employeeName, email, dateOfJoining, dateOfBirth, departmentName, gender, designation, reportingManagerEmail);
     }
 
     public String safeToString(Object value) {
@@ -236,7 +237,7 @@ public class EmailService {
     private void sendWorkAnniversaryEmail(EmployeeDTO employee) {
         try {
             String message = generateAnniversaryFreemarkerTemplate(employee);
-            sendEmail(employee.getEmail(), "Happy Work Anniversary!", message, "anniversaryImage", imageLoader.getRandomWorkAnniversaryTemplate());
+            sendEmail(employee.getEmail(), employee.getReportingManager(),"Happy Work Anniversary!", message, "anniversaryImage", imageLoader.getRandomWorkAnniversaryTemplate());
             log.info("-- Email sent successfully for Employee: {}", employee.getName());
         } catch (Exception e) {
             log.error("Error sending work anniversary email {} for Employee: {}", employee.getEmail(), employee.getName(), e);
@@ -297,13 +298,18 @@ public class EmailService {
     }
 
     // Common method to send email with inline image
-    private void sendEmail(String to, String subject, String message, String imageCid, Resource imageContent) throws MessagingException, IOException {
+    private void sendEmail(String to, String reportingManager, String subject, String message, String imageCid, Resource imageContent) throws MessagingException, IOException {
         MimeMessage mimeMessage = mailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true);
         helper.setFrom(from);
         helper.setTo(to);
-        if(! StringUtils.isEmpty(cc) && ! StringUtils.equalsIgnoreCase(subject, "Happy Work Anniversary!")) {
-            helper.setCc(cc);
+
+        if(! StringUtils.isEmpty(cc)) {
+            if(StringUtils.equalsIgnoreCase(subject, "Happy Work Anniversary!")) {
+                helper.setCc(reportingManager);
+            } else {
+                helper.setCc(cc);
+            }
         }
         helper.setSubject(subject);
         helper.setText(message, true); // true to send HTML email
