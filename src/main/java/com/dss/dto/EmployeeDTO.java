@@ -19,4 +19,5 @@ public class EmployeeDTO {
     private String departmentName;
     private String gender;
     private String designation;
+    private String reportingManager;
 }
