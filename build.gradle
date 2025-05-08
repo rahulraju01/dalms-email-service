@@ -40,3 +40,9 @@ dependencies {
 tasks.named('test') {
 	useJUnitPlatform()
 }
+
+bootJar {
+	archiveBaseName.set("birthday-email-service")
+	archiveVersion.set("jdk-17")
+	archiveFileName.set("birthday-email-service-jdk-21.jar")
+}
