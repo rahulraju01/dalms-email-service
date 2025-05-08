@@ -22,7 +22,7 @@ color: #002060;
 </head>
 <body>
 <div class="content">
-        <h2><span id="plain_text1">Congratulations to </span><strong id="place_holder1">${employeeName}</strong><span id="plain_text2"> on their </span><strong id="place_holder2">${yearsWorked}${anniversarySuffix}</strong><span id="plain_text3"> Work Anniversary at </span><strong id="place_holder3">${departmentName}</strong><span id="plain_text6"> Team!</span></h2>
+        <p style="font-weight:bold;"><span id="plain_text1">Congratulations to </span><strong id="place_holder1">${employeeName}</strong><span id="plain_text2"> on your </span><strong id="place_holder2">${yearsWorked}${anniversarySuffix}</strong><span id="plain_text3"> Work Anniversary at </span><strong id="place_holder3">${departmentName}</strong><span id="plain_text6"> Team!</span></p>
         <p id="plain_text4">We thank you for your hard work, dedication, and commitment over the <span id="place_holder4">${yearsWorked}</span> years.</p>
         <p id="plain_text5">Wishing you many more successful years ahead!</p>
         <img src="cid:anniversaryImage" class="image" alt="Anniversary Image"/>
