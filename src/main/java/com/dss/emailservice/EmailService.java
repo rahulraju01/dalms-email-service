@@ -301,7 +301,7 @@ public class EmailService {
         MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true);
         helper.setFrom(from);
         helper.setTo(to);
-        if(! StringUtils.isEmpty(cc)) {
+        if(! StringUtils.isEmpty(cc) && ! StringUtils.equalsIgnoreCase(subject, "Happy Work Anniversary!")) {
             helper.setCc(cc);
         }
         helper.setSubject(subject);
