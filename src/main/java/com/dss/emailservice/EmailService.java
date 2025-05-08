@@ -5,9 +5,6 @@ import com.dss.repository.EmployeeRepository;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
 import freemarker.template.TemplateException;
-import jakarta.annotation.PostConstruct;
-import jakarta.mail.MessagingException;
-import jakarta.mail.internet.MimeMessage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,6 +16,9 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.thymeleaf.util.StringUtils;
 
+import javax.annotation.PostConstruct;
+import javax.mail.MessagingException;
+import javax.mail.internet.MimeMessage;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.time.DayOfWeek;
@@ -26,6 +26,7 @@ import java.time.LocalDate;
 import java.time.Period;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -78,7 +79,14 @@ public class EmailService {
 
         employees.stream()
                 .map(employee -> CompletableFuture.runAsync(() ->
-                        sendBirthdayEmail(employee, getDesignationList().contains(employee.getDesignation())), taskExecutor))
+                        {
+                            try {
+                                sendBirthdayEmail(employee, getDesignationList().contains(employee.getDesignation()));
+                            } catch (Exception ex) {
+                                log.error("Unexpected error during async email sending", ex);
+                            }
+                        }
+                        , taskExecutor))
                 .forEach(CompletableFuture::join);
 
         return CompletableFuture.completedFuture(null);
@@ -115,8 +123,7 @@ public class EmailService {
     // Helper method to get the list of birthday employees
     private List<EmployeeDTO> getBirthdayEmployees(int month, int day) {
         return employeeRepository.findByBirthday(month, day).stream()
-                .map(row -> mapToEmployeeDTO(row))
-                .toList();
+                .map(row -> mapToEmployeeDTO(row)).collect(Collectors.toList());
     }
 
     // Helper method to send birthday email asynchronously
@@ -140,7 +147,7 @@ public class EmailService {
             String message = generateFreemarkerWhizzibleTemplate();
             sendEmail(employeeName, "Whizible Entries for the week", message, "whizzibleLogo", imageLoader.getIconResourceByName("whizzible-logo"));
             log.info("-- Whizzible Reminder email sent to employee: {}", employeeName);
-        } catch (MessagingException | IOException | TemplateException e) {
+        } catch (Exception e) {
             log.error("Error sending birthday email: {} for Employee: {}", employeeName, employeeName, e);
         }
     }
@@ -197,8 +204,7 @@ public class EmailService {
     // Helper method to get the list of work anniversary employees
     private List<EmployeeDTO> getAnniversaryEmployees(LocalDate oneYearAgo, int month, int day) {
         return employeeRepository.findEmployeesWithAtLeastOneYearOfService(oneYearAgo, month, day).stream()
-                .map(row -> mapToEmployeeDTO(row))
-                .toList();
+                .map(row -> mapToEmployeeDTO(row)).collect(Collectors.toList());
     }
 
     // Helper method to map raw data to EmployeeDTO
@@ -231,7 +237,7 @@ public class EmailService {
             String message = generateAnniversaryFreemarkerTemplate(employee);
             sendEmail(employee.getEmail(), "Happy Work Anniversary!", message, "anniversaryImage", imageLoader.getRandomWorkAnniversaryTemplate());
             log.info("-- Email sent successfully for Employee: {}", employee.getName());
-        } catch (MessagingException | IOException | TemplateException e) {
+        } catch (Exception e) {
             log.error("Error sending work anniversary email {} for Employee: {}", employee.getEmail(), employee.getName(), e);
         }
     }

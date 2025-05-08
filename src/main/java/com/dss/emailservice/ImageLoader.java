@@ -1,6 +1,5 @@
 package com.dss.emailservice;
 
-import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.Resource;
@@ -8,6 +7,7 @@ import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import javax.annotation.PostConstruct;
 import java.io.IOException;
 import java.util.*;
 import java.util.function.Consumer;
@@ -85,9 +85,7 @@ public class ImageLoader {
     public Resource getIconResourceByName(String iconName) {
         return Optional.ofNullable(iconName)
                 .map(icon -> iconResourceMap.getOrDefault(icon, null))
-                .orElseThrow(() -> {
-                    throw new NoSuchElementException(String.format("Unable to fetch resource for icon: %s", iconName));
-                });
+                .orElseThrow(() -> new NoSuchElementException(String.format("Unable to fetch resource for icon: %s", iconName)));
     }
 
     private Consumer<Resource[]> getBirthdayOrAnniversaryFunction(List<Resource> resourceList) {
