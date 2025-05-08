@@ -21,9 +21,9 @@ public class StartupRunner implements CommandLineRunner {
         log.info("-- Triggering Email --");
         CompletableFuture<Void> birthdayEmails = emailService.generateBirthdayEmailContent();
         CompletableFuture<Void> workAnniversaryEmails = emailService.generateWorkAnniversaryEmailContent();
-        CompletableFuture<Void> whizzibleEmails = emailService.generateWhizzibleContent();
+//        CompletableFuture<Void> whizzibleEmails = emailService.generateWhizzibleContent();
 
-        CompletableFuture.allOf(birthdayEmails, workAnniversaryEmails, whizzibleEmails)
+        CompletableFuture.allOf(birthdayEmails, workAnniversaryEmails)
                 .join();
 
         log.info("-- All Emails Sent --");

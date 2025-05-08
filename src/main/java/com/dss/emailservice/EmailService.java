@@ -209,11 +209,20 @@ public class EmailService {
         LocalDate dateOfJoining = Optional.ofNullable(row[2]).map(value -> ((java.sql.Date) value).toLocalDate()).orElse(null);
         LocalDate dateOfBirth = Optional.ofNullable(row[3]).map(value -> ((java.sql.Date) value).toLocalDate()).orElse(null);
         String departmentName = Optional.ofNullable(row[4]).map(String.class::cast).orElse("");
-        String gender = Optional.ofNullable(row[5]).map(String.class::cast).orElse("");
+        String gender = Optional.ofNullable(row[5]).map(this::safeToString).orElse("");
         String designation = Optional.ofNullable(row[6]).map(String.class::cast).orElse("");
 
         // Return a new EmployeeDTO with the mapped data
         return new EmployeeDTO(employeeName, email, dateOfJoining, dateOfBirth, departmentName, gender, designation);
+    }
+
+    public String safeToString(Object value) {
+        if (value instanceof String) {
+            return (String) value;
+        } else if (value instanceof Character) {
+            return value.toString();
+        }
+        return "";
     }
 
     // Helper method to send work anniversary email asynchronously
